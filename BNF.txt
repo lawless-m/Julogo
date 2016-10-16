@@ -1,0 +1,16 @@
+
+number: -?[1-9]+[0-9]*
+symbol: [A-Z]+[A-Z0-9_.]*
+op: + | / | - | *
+arg: ":"<symbol>
+var: "\""<symbol>
+assign: "MAKE" <arg> <expr>
+return: "OUTPUT" var | "OUTPUT" <expr>
+if: "IF" <cond> <block>
+expr: <number> | <variable> | <expr> <op> <expr>
+rep: REPEAT <expr> [ <action> ]
+proc: <symbol>
+action: <move> | <proc> | <rep>
+move: <cmd> <expr>
+cmd: "FD" | "FORWARD" | "BK" | "BACK" | "LEFT" | "LT" | "RIGHT" | "RT" | "PU" | "PENUP" | "PD" | "PENDOWN"
+
