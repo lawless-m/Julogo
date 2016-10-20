@@ -1,4 +1,11 @@
 
+
+@enum CMDS fd forward bk back left lt right rt pu penup pd pendown exit
+
+type Lex
+	cmd::CMDS
+end
+
 prompt = "L> "
 
 function input()
@@ -7,16 +14,24 @@ function input()
 		while length(ln) > 0
 			p, ln = split(ln, [' ', '\r', '\n'];limit=2)
 			if length(p) > 0
-				produce(p)
+				if typeof(eval(Symbol(p))) == CMDS
+					produce(Lex(eval(Symbol(p))))
+				else
+					produce(p)
+				end
+				
 			end
 		end
 		@printf "%s" prompt
 	end
 end
 
+
 for t in Task(input)
-	if t == "exit"
-		quit()
+	if typeof(t) == Lex
+		if t.cmd == exit
+			quit()
+		end
 	end
 	if t == "to"
 		prompt = "TO> "
@@ -24,7 +39,7 @@ for t in Task(input)
 	if t == "end"
 		prompt = "L> "
 	end
-	@printf "L:%s\n" t
+	@printf "L:%s - %s\n" t typeof(t)
 end
 
 	
