@@ -1,4 +1,4 @@
-module Turtles
+module Turtle
 #=
 	This module tracks the state of a turtle
 	I suppose multiple turtles will be allowed maybe even remote ones
@@ -7,6 +7,8 @@ module Turtles
 	
 	So the reference point for the T will be in Polar co-ordinates, any other representation shall be invalidated by movement
 =#
+
+export forward, backward, left, right
 
 @enum PenState PenUp PenDown PenRed PenBlue PenGreen
 
