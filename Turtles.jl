@@ -1,4 +1,4 @@
-module Turtle
+module Turtles
 #=
 	This module tracks the state of a turtle
 	I suppose multiple turtles will be allowed maybe even remote ones
@@ -25,7 +25,7 @@ function forward(t::Turtle, r)
 	push!(t.track, (0.0, -r, t.p))
 end
 
-function back(t::Turtle, r)
+function backward(t::Turtle, r)
 	t.r -= r
 	push!(t.track, (0.0, -r, t.p))
 end

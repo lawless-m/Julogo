@@ -1,14 +1,13 @@
 unshift!(LOAD_PATH, ".")
 using Turtles
 
-const CMDS = Dict{AbstractString, Tuple{Function, Int64}()
+CMDS = Dict{AbstractString, Tuple{Function, Int64}}()
 
-
-CMDS['forward'] = (forward, 1)
-CMDS['back'] = (backward, 1)
-CMDS['left'] = (left, 1)
-CMDS['right'] = (right, 1)
-CMDS['exit'] = (quit, 0)
+CMDS["forward"] = (forward, 1)
+CMDS["back"] = (backward, 1)
+CMDS["left"] = (left, 1)
+CMDS["right"] = (right, 1)
+CMDS["exit"] = (quit, 0)
 
 type Expr
 	op::Function
@@ -44,10 +43,10 @@ function pushExpr!(c::Cmd, e::Expr)
 end
 
 type SymbolTable
-	parent::SymbolTable
+	parent::Union{SymbolTable, Void}
 	symbols::Dict{AbstractString, Union{Float64, AbstractString}}
-	SymbolTable() = new(nothing, Dict{AbstractString, Union{Float64, AbstractString}}()
-	SymbolTable(p) = new(p, Dict{AbstractString, Union{Float64, AbstractString}}()
+	SymbolTable() = new(nothing, Dict{AbstractString, Union{Float64, AbstractString}}())
+	SymbolTable(p) = new(p, Dict{AbstractString, Union{Float64, AbstractString}}())
 end
 
 type CmdBlock
@@ -55,7 +54,7 @@ type CmdBlock
 	symbols::SymbolTable
 	CmdBlock(c, s) = new(c, s)
 	CmdBlock(s) = new(Vector{Cmd}(), s)
-	CmdBlock() = new(SymbolTable())
+	CmdBlock() = new(Vector{Cmd}(), SymbolTable())
 end
 
 
@@ -71,11 +70,11 @@ function lookup(s::Symbol, st::SymbolTable)
 end
 
 function evaluate(e::Expr, s::SymbolTable)
-	e.op(map(f(e)->evaluate(e, s), c.es)...)
+	e.op(map((e)->evaluate(e, s), c.es)...)
 end
 
 function execute(c::Cmd, s::SymbolTable)
-	c.fn(map(f(e)->evaluate(e, s), c.es)...)
+	c.fn(map((e)->evaluate(e, s), c.es)...)
 end
 
 function execute(s::CmdBlock)
@@ -109,8 +108,8 @@ end
 
 glob = CmdBlock()
 @enum EXPECTS Ecmd Ecmd_or_expr Eexpr Eop_or_expr
-@enum GLOBSTATE execute compile
-globstate = execute
+@enum GLOBSTATE GSexecute GScompile
+globstate = GSexecute
 
 scope = glob
 
@@ -128,7 +127,7 @@ for t in Task(input)
 	
 	if typeof(stack[end]) == Cmd
 		if loaded(Cmd)
-			if globstate == execute
+			if globstate == GSexecute
 				execute(pop!(stack))
 				expecting = Ecmd
 			end
