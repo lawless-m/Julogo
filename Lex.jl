@@ -1,45 +1,26 @@
-unshift!(LOAD_PATH, ".")
-using Turtles
+module Lex
 
-CMDS = Dict{AbstractString, Tuple{Function, Int64}}()
+abstract Lexeme
 
-CMDS["forward"] = (forward, 1)
-CMDS["back"] = (backward, 1)
-CMDS["left"] = (left, 1)
-CMDS["right"] = (right, 1)
-CMDS["exit"] = (quit, 0)
-
-type Expr
-	op::Function
-	es::Vector{Union{Expr, Float64, Symbol}}
-	Expr(op::Function) = new(op, Expr[])
-	Expr(n::Float64) = new((x)->x, Expr[n])
-	Expr(op::Function, e) = new(op, Expr[e])
-end
-
-type Cmd
+type Num <: Lexeme
 	txt::AbstractString
-	fn::Function
+	value::Float64
+end
+
+type Oper <: Lexeme
+	txt::AbstractString
+	value::Function
 	arity::Int64
-	args::Vector{Expr}
-	Cmd(t, fn, a) = new(t, fn, a, Vector{Expr}())
-	function Cmd(a::AbstractString)
-		if haskey(CMDS, a)
-			return new(a, CMDS[a][1], CMDS[a][2])
-		end
-		error("No such command: $a")
-	end
 end
 
-function loaded(c::Cmd)
-	size(c.args)[1] == c.arity
+type Cmd <: Lexeme
+	txt::AbstractString
+	value::Function
+	arity::Int64
 end
 
-function pushExpr!(c::Cmd, e::Expr)
-	if loaded(c)
-		error("Too many arguments for $(c.txt)")
-	end
-	push!(c.args, e)
+type Symbol <: Lexeme
+	txt::AbstractString
 end
 
 type SymbolTable
@@ -48,15 +29,6 @@ type SymbolTable
 	SymbolTable() = new(nothing, Dict{AbstractString, Union{Float64, AbstractString}}())
 	SymbolTable(p) = new(p, Dict{AbstractString, Union{Float64, AbstractString}}())
 end
-
-type CmdBlock
-	cmds::Vector{Cmd}
-	symbols::SymbolTable
-	CmdBlock(c, s) = new(c, s)
-	CmdBlock(s) = new(Vector{Cmd}(), s)
-	CmdBlock() = new(Vector{Cmd}(), SymbolTable())
-end
-
 
 function lookup(s::Symbol, st::SymbolTable)
 	if st==nothing
@@ -69,70 +41,48 @@ function lookup(s::Symbol, st::SymbolTable)
 	end
 end
 
-function evaluate(e::Expr, s::SymbolTable)
-	e.op(map((e)->evaluate(e, s), c.es)...)
+
+CMDS = Dict{AbstractString, Tuple{Function, Int64}}()
+
+CMDS["forward"] = (forward, 1)
+CMDS["back"] = (backward, 1)
+CMDS["left"] = (left, 1)
+CMDS["right"] = (right, 1)
+CMDS["exit"] = (quit, 0)
+
+OPS["+"] = (+, 2)
+OPS["-"] = (-, 2)
+OPS["*"] = (*, 2)
+OPS["/"] = (/, 2)
+OPS("MOD") = (mod, 2)
+OPS("ABS") = (abs, 1
+OPS("ARCTAN") = (atan, 1)
+OPS("SIN") = (sin, 1)
+OPS("COS") = (cos, 1)
+OPS("TAN") = (tan, 1)
+
+function nullfn()
 end
 
-function execute(c::Cmd, s::SymbolTable)
-	c.fn(map((e)->evaluate(e, s), c.es)...)
-end
-
-function execute(s::CmdBlock)
-	for pc = 1:size(s.cmds)
-		execute(s.scmds[pc], s.symbols)
-	end
-end
-
-prompt = "L> "
-function input()
-	@printf "%s" prompt
-	for ln in eachline(STDIN)
+function input(stream, promptfn=nullfn)
+	promptfn()
+	for ln in eachline(stream)
 		while length(ln) > 0
 			p, ln = split(ln, [' ', '\r', '\n'];limit=2)
 			if length(p) > 0
-				produce(p)
-				#=
-				if typeof(eval(Symbol(p))) == CMDS
-					produce(Lex(eval(Symbol(p))))
-				else
-					if isnumber(p)
-						produce(Expr(parse(Float64, p)))
-					end
-				end				
-				=#
+				if haskey(CMDS, p)
+					produce(Cmd(p, CMDS[p], CMDS[p]))
+				elseif haskey(OPS, p)
+					produce(Op(p, CMDS[p], CMDS[p]))
+				elseif isnumber(p)
+					produce(Num(p, parse(Float64, p)))
+				elseif p[1] == ":"
+					produce(Expr(p, lookup, p)
+				
+				end
 			end
 		end
-		@printf "%s" prompt
+		promptfn()
 	end
-end
-
-glob = CmdBlock()
-@enum EXPECTS Ecmd Ecmd_or_expr Eexpr Eop_or_expr
-@enum GLOBSTATE GSexecute GScompile
-globstate = GSexecute
-
-scope = glob
-
-expecting = Ecmd
-stack = Union{Cmd, Expr}[]
-
-for t in Task(input)
-	if expecting == Ecmd
-		c = Cmd(t)
-	elseif expecting == Expr
-		push!(stack, Expr(t))
-		pushExpr!(c, stack[end])
-		expecting = Ecmd_or_expr
-	end
-	
-	if typeof(stack[end]) == Cmd
-		if loaded(Cmd)
-			if globstate == GSexecute
-				execute(pop!(stack))
-				expecting = Ecmd
-			end
-		end
-	end
-	
 end
 
