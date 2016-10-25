@@ -2,25 +2,22 @@ module Lex
 
 abstract Lexeme
 
-type Num <: Lexeme
-	txt::AbstractString
-	value::Float64
-end
-
 type Oper <: Lexeme
 	txt::AbstractString
-	value::Function
+	fn::Function
 	arity::Int64
+	args::Vector{Oper}
+	Oper(t, fn, a) = new(t, v, a, Oper[])
+	Oper(t, p) = new(t, p[1], p[2])
 end
 
 type Cmd <: Lexeme
 	txt::AbstractString
-	value::Function
+	fn::Function
 	arity::Int64
-end
-
-type Symbol <: Lexeme
-	txt::AbstractString
+	args::Vector{Oper}
+	Cmd(t, f, a) = new(t, v, a, Oper[])
+	Cmd(t, p) = new(t, p[1], p[2], Oper[])
 end
 
 type SymbolTable
@@ -41,44 +38,48 @@ function lookup(s::Symbol, st::SymbolTable)
 	end
 end
 
+function assign(s::Symbol, st::SymbolTable, v)
+	st[s] = v
+end
 
 CMDS = Dict{AbstractString, Tuple{Function, Int64}}()
+OPS = Dict{AbstractString, Tuple{Function, Int64}}()
 
-CMDS["forward"] = (forward, 1)
-CMDS["back"] = (backward, 1)
-CMDS["left"] = (left, 1)
-CMDS["right"] = (right, 1)
+#CMDS["forward"] = (forward, 1)
+#CMDS["back"] = (backward, 1)
+#CMDS["left"] = (left, 1)
+#CMDS["right"] = (right, 1)
 CMDS["exit"] = (quit, 0)
+CMDS["print"] = (println, 1)
 
 OPS["+"] = (+, 2)
 OPS["-"] = (-, 2)
 OPS["*"] = (*, 2)
 OPS["/"] = (/, 2)
-OPS("MOD") = (mod, 2)
-OPS("ABS") = (abs, 1
-OPS("ARCTAN") = (atan, 1)
-OPS("SIN") = (sin, 1)
-OPS("COS") = (cos, 1)
-OPS("TAN") = (tan, 1)
+OPS["MOD"] = (mod, 2)
+OPS["ABS"] = (abs, 1)
+OPS["ARCTAN"] = (atan, 1)
+OPS["SIN"] = (sin, 1)
+OPS["COS"] = (cos, 1)
+OPS["TAN"] = (tan, 1)
 
-function nullfn()
-end
 
-function input(stream, promptfn=nullfn)
+function input(stream, promptfn)
 	promptfn()
 	for ln in eachline(stream)
 		while length(ln) > 0
 			p, ln = split(ln, [' ', '\r', '\n'];limit=2)
 			if length(p) > 0
 				if haskey(CMDS, p)
-					produce(Cmd(p, CMDS[p], CMDS[p]))
+					produce(Cmd(p, CMDS[p]))
 				elseif haskey(OPS, p)
-					produce(Op(p, CMDS[p], CMDS[p]))
+					produce(Oper(p, OPS[p]))
 				elseif isnumber(p)
-					produce(Num(p, parse(Float64, p)))
-				elseif p[1] == ":"
-					produce(Expr(p, lookup, p)
-				
+					produce(Oper(p, ((st)->parse(Float64, p), 0)))
+				elseif p[1] == ':'
+					produce(Oper(p, ((st)->lookup(symbol(p)), p)))
+				elseif p[1] == '"'
+					produce(Oper(p, ((st, v)->assign(st, symbol(p), v), p)))
 				end
 			end
 		end
@@ -86,3 +87,6 @@ function input(stream, promptfn=nullfn)
 	end
 end
 
+
+# staahhhppp
+end

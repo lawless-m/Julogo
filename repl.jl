@@ -1,5 +1,74 @@
 
+cd(ENV["USERPROFILE"] * "/Documents")
+unshift!(LOAD_PATH, abspath("GitHub/Julogo/"))
 
+
+using Lex: Cmd, Oper, SymbolTable
+
+function prompt()
+	@printf "L> "
+end
+
+function run(c::Cmd, st::SymbolTable)
+	if c.arity == 0
+		c.fn()
+	else
+		args = [a.fn(st) for a in c.args]
+		@printf STDERR "ARGS %s\n" args
+		c.fn(args...)
+	end
+end
+
+function loaded(c::Cmd)
+	size(c.args)[1] == c.arity
+end
+	
+execute = true	
+globalst = SymbolTable()
+stack = Union{Cmd, Oper}[]
+	
+for t in Task(()->Lex.input(STDIN, prompt))
+	println(t)
+	if size(stack)[1] > 0
+		if typeof(stack[end]) == Cmd
+			if loaded(stack[end])
+				if execute
+					while size(stack)[1] > 0
+						run(pop!(stack), globalst)
+					end
+				end
+			else
+				if typeof(t) == Oper
+					@printf STDERR ">C %s\n" t
+					push!(stack[end].args, t)
+					if execute && loaded(stack[end])
+						run(pop!(stack), globalst)
+					end
+				else
+					error("No enough arguments for $(stack[end].txt) expecting $(stack[end].arity) got $(size(stack[end].args)[1])")
+				end
+			end
+		end
+	elseif typeof(t) == Oper
+		error("Expecting Cmd got Oper")
+	elseif execute && loaded(t)
+		run(t, globalst)
+	else
+		@printf STDERR ">S %s\n" t
+		push!(stack, t)
+	end	
+end
+
+#=
+
+
+
+prompt()
+for ln in eachline(STDIN)
+	if cmd(ln)
+		prompt()
+	end
+end
 
 type Expr
 	op::Union{Function, Void}
@@ -183,3 +252,4 @@ for ln in eachline(STDIN)
 		prompt()
 	end
 end
+=#
