@@ -4,14 +4,15 @@ symbol: [A-Z]+[A-Z0-9_.]*
 op: + | / | - | *
 arg: ":"<symbol>
 var: "\""<symbol>
-assign: "MAKE" <arg> <expr>
-return: "OUTPUT" var | "OUTPUT" <expr>
+assign: "MAKE" <arg> <Eq>
+return: "OUTPUT" var | "OUTPUT" <Eq>
 if: "IF" <cond> <block>
 
-expr: <number> | <variable> | <op><expr>... 
-rep: REPEAT <expr> [ <action> ]
+Eq: <number> | <variable> | <op><Eq>... 
+rep: REPEAT <Eq> [ <action> ]
 proc: <symbol>
 action: <move> | <proc> | <rep>
-move: <cmd> <expr>
+move: <cmd> <Eq>
 cmd: "FD" | "FORWARD" | "BK" | "BACK" | "LEFT" | "LT" | "RIGHT" | "RT" | "PU" | "PENUP" | "PD" | "PENDOWN"
 
+b

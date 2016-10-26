@@ -1,47 +1,49 @@
 module Lex
 
-export Lexeme, Oper, Action, SymbolTable, EOL
+export Lexeme, EOL, Exp, Oper, Value, Variable, Eq, Action, SymbolTable, lookup, assign, input
 
 abstract Lexeme
 
 type EOL <: Lexeme
 end
 
-type Oper <: Lexeme
+abstract Exp <: Lexeme
+
+type Oper <: Exp
 	txt::AbstractString
 	fn::Function
 	arity::Int64
-	args::Vector{Oper}
-	Oper(t, fn, a) = new(t, v, a, Oper[])
-	Oper(t, p) = new(t, p[1], p[2])
+	args::Vector{Exp}
+	Oper(t, fn, a) = new(t, v, a, Exp[])
+	Oper(t, p) = new(t, p[1], p[2], Exp[])
 end
 
-type Value <: Lexeme
+type Value <: Exp
 	txt::AbstractString
 	fn::Function
-	Value(t, v) = new(t, v)
+	Value(t, v) = new(t, (st)->v)
 end
 
-type Variable <: Lexeme
+type Variable <: Exp
 	txt::AbstractString
 	s::Symbol
 	Variable(t) = new(t, symbol(t))
 end
 
-type Expr <: Lexeme
-	value::Union{Value, Variable, Tuple{Oper, Vector{Expr}})
-	Expr(val::Value) = new(val)
-	Expr(var::Variable) = new(var)
-	Expr(op::Oper) = new((op, Vector{Expr}()))
+type Eq <: Exp
+	value::Union{Value, Variable, Oper}
+	Eq(val::Value) = new(val)
+	Eq(var::Variable) = new(var)
+	Eq(op::Oper) = new(op)
 end
 
 type Action <: Lexeme
 	txt::AbstractString
 	fn::Function
 	arity::Int64
-	args::Vector{Expr}
-	Action(t, f, e) = new(t, v, a, Expr[])
-	Action(t, p) = new(t, p[1], p[2], Expr[])
+	args::Vector{Eq}
+	Action(t, f, e) = new(t, v, a, Eq[])
+	Action(t, p) = new(t, p[1], p[2], Eq[])
 end
 
 type SymbolTable
@@ -97,13 +99,13 @@ function input(stream, promptfn)
 				if haskey(ActionS, p)
 					produce(Action(p, ActionS[p]))
 				elseif haskey(OPS, p)
-					produce(Expr(Oper(p, OPS[p])))
+					produce(Eq(Oper(p, OPS[p])))
 				elseif isnumber(p)
-					produce(Expr(Value(p, parse(Float64, p))))
+					produce(Eq(Value(p, parse(Float64, p))))
 				elseif p[1] == ':'
-					produce(Expr(Variable(p[2:end])))
+					produce(Eq(Variable(p[2:end])))
 				elseif p[1] == '"'
-					produce(Expr(Variable(p[2:end])))
+					produce(Eq(Variable(p[2:end])))
 				end
 			end
 		end
