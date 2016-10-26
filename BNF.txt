@@ -7,7 +7,8 @@ var: "\""<symbol>
 assign: "MAKE" <arg> <expr>
 return: "OUTPUT" var | "OUTPUT" <expr>
 if: "IF" <cond> <block>
-expr: <number> | <variable> | <expr> <op> <expr>
+
+expr: <number> | <variable> | <op><expr>... 
 rep: REPEAT <expr> [ <action> ]
 proc: <symbol>
 action: <move> | <proc> | <rep>

@@ -1,6 +1,11 @@
 module Lex
 
+export Lexeme, Oper, Action, SymbolTable, EOL
+
 abstract Lexeme
+
+type EOL <: Lexeme
+end
 
 type Oper <: Lexeme
 	txt::AbstractString
@@ -11,13 +16,32 @@ type Oper <: Lexeme
 	Oper(t, p) = new(t, p[1], p[2])
 end
 
-type Cmd <: Lexeme
+type Value <: Lexeme
+	txt::AbstractString
+	fn::Function
+	Value(t, v) = new(t, v)
+end
+
+type Variable <: Lexeme
+	txt::AbstractString
+	s::Symbol
+	Variable(t) = new(t, symbol(t))
+end
+
+type Expr <: Lexeme
+	value::Union{Value, Variable, Tuple{Oper, Vector{Expr}})
+	Expr(val::Value) = new(val)
+	Expr(var::Variable) = new(var)
+	Expr(op::Oper) = new((op, Vector{Expr}()))
+end
+
+type Action <: Lexeme
 	txt::AbstractString
 	fn::Function
 	arity::Int64
-	args::Vector{Oper}
-	Cmd(t, f, a) = new(t, v, a, Oper[])
-	Cmd(t, p) = new(t, p[1], p[2], Oper[])
+	args::Vector{Expr}
+	Action(t, f, e) = new(t, v, a, Expr[])
+	Action(t, p) = new(t, p[1], p[2], Expr[])
 end
 
 type SymbolTable
@@ -42,15 +66,15 @@ function assign(s::Symbol, st::SymbolTable, v)
 	st[s] = v
 end
 
-CMDS = Dict{AbstractString, Tuple{Function, Int64}}()
+ActionS = Dict{AbstractString, Tuple{Function, Int64}}()
 OPS = Dict{AbstractString, Tuple{Function, Int64}}()
 
-#CMDS["forward"] = (forward, 1)
-#CMDS["back"] = (backward, 1)
-#CMDS["left"] = (left, 1)
-#CMDS["right"] = (right, 1)
-CMDS["exit"] = (quit, 0)
-CMDS["print"] = (println, 1)
+#ActionS["forward"] = (forward, 1)
+#ActionS["back"] = (backward, 1)
+#ActionS["left"] = (left, 1)
+#ActionS["right"] = (right, 1)
+ActionS["exit"] = (quit, 0)
+ActionS["print"] = (println, 1)
 
 OPS["+"] = (+, 2)
 OPS["-"] = (-, 2)
@@ -70,19 +94,20 @@ function input(stream, promptfn)
 		while length(ln) > 0
 			p, ln = split(ln, [' ', '\r', '\n'];limit=2)
 			if length(p) > 0
-				if haskey(CMDS, p)
-					produce(Cmd(p, CMDS[p]))
+				if haskey(ActionS, p)
+					produce(Action(p, ActionS[p]))
 				elseif haskey(OPS, p)
-					produce(Oper(p, OPS[p]))
+					produce(Expr(Oper(p, OPS[p])))
 				elseif isnumber(p)
-					produce(Oper(p, ((st)->parse(Float64, p), 0)))
+					produce(Expr(Value(p, parse(Float64, p))))
 				elseif p[1] == ':'
-					produce(Oper(p, ((st)->lookup(symbol(p)), p)))
+					produce(Expr(Variable(p[2:end])))
 				elseif p[1] == '"'
-					produce(Oper(p, ((st, v)->assign(st, symbol(p), v), p)))
+					produce(Expr(Variable(p[2:end])))
 				end
 			end
 		end
+		produce(EOL())
 		promptfn()
 	end
 end
