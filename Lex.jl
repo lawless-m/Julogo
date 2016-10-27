@@ -1,49 +1,70 @@
 module Lex
 
-export Lexeme, EOL, Exp, Oper, Value, Variable, Eq, Action, SymbolTable, lookup, assign, input
+export Ops, Actions, Lexeme, Unrecognised, EOL, Oper, Natural, Numeric, Lookup, Assign, Value, Eq, Action, SymbolTable, lookup, assign, input
 
 abstract Lexeme
+
+type Unrecognised <: Lexeme
+	txt::AbstractString
+end
 
 type EOL <: Lexeme
 end
 
-abstract Exp <: Lexeme
+abstract Oper <: lexeme
 
-type Oper <: Exp
+type LH <: Oper
 	txt::AbstractString
 	fn::Function
-	arity::Int64
-	args::Vector{Exp}
-	Oper(t, fn, a) = new(t, v, a, Exp[])
-	Oper(t, p) = new(t, p[1], p[2], Exp[])
 end
 
-type Value <: Exp
+type RH <: Oper
 	txt::AbstractString
 	fn::Function
-	Value(t, v) = new(t, (st)->v)
 end
 
-type Variable <: Exp
+type Op <: Oper
+	txt::AbstractString
+	fn::Function
+end
+
+abstract Value <: Lexeme
+
+type Natural <: Value
+	txt::AbstractString
+	value::UInt64
+end
+
+type Numeric <: Value
+	txt::AbstractString
+	value::Float64
+end
+
+type Lookup <: Value
 	txt::AbstractString
 	s::Symbol
-	Variable(t) = new(t, symbol(t))
 end
 
-type Eq <: Exp
-	value::Union{Value, Variable, Oper}
-	Eq(val::Value) = new(val)
-	Eq(var::Variable) = new(var)
-	Eq(op::Oper) = new(op)
+type Assign <: Lexeme
+	txt::AbstractString
+	s::Symbol
+end
+
+type Eq <: Value
+	op::Union{Oper, Void}
+	lh::Union{Value, Void}
+	rh::Union{Value, Void}
+	Eq(val::Value) = new(nothing, val, nothing)
+	Eq(op::Oper) = new(op, nothing, nothing)
 end
 
 type Action <: Lexeme
 	txt::AbstractString
 	fn::Function
 	arity::Int64
-	args::Vector{Eq}
-	Action(t, f, e) = new(t, v, a, Eq[])
-	Action(t, p) = new(t, p[1], p[2], Eq[])
+	args::Vector{Value}
+	Action(t, f, a) = new(t, f, a, Value[])
+	Action(t, p) = new(t, p[1], p[2], Value[])
 end
 
 type SymbolTable
@@ -68,26 +89,8 @@ function assign(s::Symbol, st::SymbolTable, v)
 	st[s] = v
 end
 
-ActionS = Dict{AbstractString, Tuple{Function, Int64}}()
-OPS = Dict{AbstractString, Tuple{Function, Int64}}()
-
-#ActionS["forward"] = (forward, 1)
-#ActionS["back"] = (backward, 1)
-#ActionS["left"] = (left, 1)
-#ActionS["right"] = (right, 1)
-ActionS["exit"] = (quit, 0)
-ActionS["print"] = (println, 1)
-
-OPS["+"] = (+, 2)
-OPS["-"] = (-, 2)
-OPS["*"] = (*, 2)
-OPS["/"] = (/, 2)
-OPS["MOD"] = (mod, 2)
-OPS["ABS"] = (abs, 1)
-OPS["ARCTAN"] = (atan, 1)
-OPS["SIN"] = (sin, 1)
-OPS["COS"] = (cos, 1)
-OPS["TAN"] = (tan, 1)
+Actions = Dict{AbstractString, Tuple{Function, Int64}}()
+Ops = Dict{AbstractString, Tuple{Function, Int64}}()
 
 
 function input(stream, promptfn)
@@ -96,16 +99,27 @@ function input(stream, promptfn)
 		while length(ln) > 0
 			p, ln = split(ln, [' ', '\r', '\n'];limit=2)
 			if length(p) > 0
-				if haskey(ActionS, p)
-					produce(Action(p, ActionS[p]))
-				elseif haskey(OPS, p)
-					produce(Eq(Oper(p, OPS[p])))
+				if haskey(Actions, p)
+					produce(Action(p, Actions[p]))
+				elseif haskey(RHs, p)
+					produce(RH(p, RHs[p]))
+				elseif haskey(LHOps, p)
+					produce(LH(p, LHs[p]))
+				elseif haskey(LHs, p)
+					produce(Op(p, Ops[p]))
 				elseif isnumber(p)
-					produce(Eq(Value(p, parse(Float64, p))))
+					produce(Natural(p, parse(Int64, p)))
+				elseif !isnull(tryparse(Float64, p))
+					produce(Numeric(p, parse(Float64, p)))
 				elseif p[1] == ':'
-					produce(Eq(Variable(p[2:end])))
+					produce(Lookup(p, symbol(p[2:end])))
 				elseif p[1] == '"'
-					produce(Eq(Variable(p[2:end])))
+					produce(Assign(p, symbol(p[2:end])))
+				elseif p == "~"
+					ln = ""
+					continue
+				else
+					produce(Unrecognised(p))
 				end
 			end
 		end

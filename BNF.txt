@@ -1,18 +1,20 @@
 
-number: -?[1-9]+[0-9]*
-symbol: [A-Z]+[A-Z0-9_.]*
-op: + | / | - | *
-arg: ":"<symbol>
-var: "\""<symbol>
-assign: "MAKE" <arg> <Eq>
-return: "OUTPUT" var | "OUTPUT" <Eq>
+numeric: <Float64>
+natural: <UInt64>
+number: <numeric> | <natural>
+symbol: <Symbol>
+lh: / | * .....etc.
+rh: + | - 
+op: sin | cos | abs ....etc.
+lookup: :<symbol>
+var: "<symbol>
+assign: MAKE <var> <Eq>
+return: "OUTPUT" var | "OUTPUT" <eq>
 if: "IF" <cond> <block>
-
-Eq: <number> | <variable> | <op><Eq>... 
-rep: REPEAT <Eq> [ <action> ]
+eq: <number> | <lookup> | <eq> <lhop> <eq> | <eq> <rhop> <eq> | <op> <eq>
+rep: REPEAT <natural> [ <action> ]
 proc: <symbol>
 action: <move> | <proc> | <rep>
 move: <cmd> <Eq>
 cmd: "FD" | "FORWARD" | "BK" | "BACK" | "LEFT" | "LT" | "RIGHT" | "RT" | "PU" | "PENUP" | "PD" | "PENDOWN"
-
-b
+eol: \n

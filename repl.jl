@@ -5,8 +5,28 @@ unshift!(LOAD_PATH, abspath("GitHub/Julogo/"))
 
 using Lex
 
+#ActionS["forward"] = (forward, 1)
+#ActionS["back"] = (backward, 1)
+#ActionS["left"] = (left, 1)
+#ActionS["right"] = (right, 1)
+Actions["exit"] = (quit, 0)
+Actions["print"] = (println, 1)
+
+LHs["*"] = *
+LHs["/"] = /
+
+RHs["+"] = +
+RHs["-"] = -
+RHs["MOD"] = mod
+
+Unary["ABS"] = abs
+Unary["ARCTAN"] = atan
+Unary["SIN"] = sin
+Unary["COS"] = cos
+Unary["TAN"] = tan
+
 function prompt()
-	@printf "L> "
+	@printf "%s L> " stack
 end
 
 function run(c::Action, st::SymbolTable)
@@ -19,27 +39,6 @@ function run(c::Action, st::SymbolTable)
 	end
 end
 
-function loaded(c::Action)
-	size(c.args)[1] == c.arity
-end
-
-function loaded(e::Eq)
-	loaded(e.value[1])
-end
-
-function loaded(o::Oper)
-	size(o.args)[1] == o.arity
-end
-
-function loaded(v::Value)
-	false
-end
-
-function loaded(v::Variable)
-	false
-end
-
-
 function drainStack(msg)
 	warn(msg)
 	while size(stack)[1] > 0
@@ -47,12 +46,16 @@ function drainStack(msg)
 	end
 end
 
-macro top()
-	:( stack[end] )
+function top()
+	size(stack)[1] > 0 ? stack[end] : nothing
+end
+
+function loaded(a::Action)
+	size(a.args)[1] == a.arity
 end
 
 function notEnoughArgs()
-	"No enough arguments for $(@top().txt) expecting $(@top().arity) got $(size(@top().args)[1])"
+	"No enough arguments for $(top().txt) expecting $(top().arity) got $(size(top().args)[1])"
 end
 
 execute = true	
@@ -60,84 +63,52 @@ globalst = SymbolTable()
 stack = Lexeme[]
 	
 
-function gotEqZ(top::Eq, e::Eq, o::Oper)
-	drainStack("Unexpected operation")
+function gotLexeme(l::Lexeme, u::Unrecognised)	
+	drainStack("$(typeof(l)): $(u.txt)")
 end
 
-function gotEq(top::Eq, e::Eq, v::Variable)
-	push!(top.args, e)
-end
-	
-function gotEq(top::Eq, e::Eq, v::Value)
-	push!(top.args, e)
-end
-
-function gotEq(top::Action, e::Eq, ex::Exp)
-	push!(top.args, e)
-end
-
-function gotEq(val::Value, e::Eq, op::Oper)
-	push!(op.args, pop!(@top().args))
-	push!(@top().args, op)
-end
-
-function gotEq(var::Variable, e::Eq, op::Oper)
-	push!(op.args, pop!(@top().args))
-	push!(@top().args, op)
-end
-
-function gotEq(top::Oper, e::Eq, op::Oper)
-	drainStack("Unexpected Operator")
-end
-
-function gotEq(top::Action, e::Eq, op::Oper)
-	gotEq(top.args[end].value, e, op)
-	push!(top.args, e)
-end
-
-function gotEq(top::Action, e::Eq, v::Value)
-	if loaded(top)
-		gotEq(top.args[end], e, v)
-	else
-		push!(top.args, e)
-	end
-end
-
-
-function gotLexeme(e::Eq)
-	gotEq(@top(), e, e.value)
-end
-
-function gotAction(top::Action, a::Action)
-	if loaded(top)
-		push!(stack, a)
+function gotLexeme(a::Action, v::Value)
+	if a.arity == 0
+		drainStack("Unxpected Operation, expecting Action")
 		return
 	end
 	
-	drainStack(notEnoughArgs())
 end
 
-function gotAction(top::Oper, a::Action)
-	if loaded(top)
-		push!(stack, a)
+function gotLexeme(a::Action, v::Value)
+	if a.arity == 0
+		drainStack("Unexpected Value, expecting Action")
 		return
 	end
-	drainStack("Unexpected command $(a.txt) - expected Eqession")
-end
-
-function gotLexeme(c::Action)	
-	if size(stack)[1] == 0
-		push!(stack, c)
+	# ok, just waiting for a value
+	if sizeof(a.args)[1] == 0
+		push!(a.args, Eq(v))
 		return
 	end
 	
-	gotAction(@top(), c)
+	# we already have a value but no op
+	if a.args[end].op == nothing
+		drainStack("Unexpected Value")
+		return
+	end
+	
+	
 end
 
+function gotLexeme(v::Void, l::Lexeme)	
+	drainStack("Expecing Action, got $(typeof(l))")
+end
 
-function gotLexeme(eol::EOL)
-	@printf STDERR "ST %s\n" stack
-	if ! loaded(@top())	
+function gotLexeme(v::Void, a::Action)
+	push!(stack, a)
+end
+
+function gotLexeme(l::Lexeme, eol::EOL)	
+	drainStack("Unexepcted $(typeof(l))")
+end
+
+function gotLexeme(a::Action, eol::EOL)
+	if ! loaded(a)	
 		drainStack(notEnoughArgs())
 		return
 	end
@@ -149,8 +120,10 @@ function gotLexeme(eol::EOL)
 	end
 end
 
+gotLexeme(top::Void, eol::EOL) = nothing
+
 for lexeme in Task(()->input(STDIN, prompt))
-	println(lexeme)
-	gotLexeme(lexeme)
+	println("Got: " * string(lexeme))
+	gotLexeme(top(), lexeme)
 end
 
