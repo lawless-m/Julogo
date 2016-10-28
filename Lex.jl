@@ -1,6 +1,12 @@
 module Lex
 
-export Ops, Actions, Lexeme, Unrecognised, EOL, Oper, Natural, Numeric, Lookup, Assign, Value, Eq, Action, SymbolTable, lookup, assign, input
+# Lexemes
+export Lexeme, Unrecognised, EOL
+export Oper, RH, LH, Unary, Binary
+export Value, Natural, Numeric, Variable, Eq
+export Action, Assign
+export Actions, LHs, RHs, Unarys
+export SymbolTable, evaluate, assign, input
 
 abstract Lexeme
 
@@ -11,36 +17,50 @@ end
 type EOL <: Lexeme
 end
 
-abstract Oper <: lexeme
+abstract Oper <: Lexeme
 
-type LH <: Oper
+abstract Binary <: Oper
+
+type LH <: Binary
 	txt::AbstractString
 	fn::Function
 end
 
-type RH <: Oper
+type RH <: Binary
 	txt::AbstractString
 	fn::Function
 end
 
-type Op <: Oper
+type Unary <: Oper
 	txt::AbstractString
 	fn::Function
 end
 
 abstract Value <: Lexeme
 
-type Natural <: Value
-	txt::AbstractString
-	value::UInt64
+type Eq <: Value
+	op::Union{Oper, Void}
+	lh::Union{Value, Void}
+	rh::Union{Value, Void}
+	Eq(op, lh, rh) = new(op, lh, rh)
+	Eq(op, v) = new(op, v, nothing)
+	Eq(val::Value) = new(nothing, val, nothing)
+	Eq(op::Oper) = new(op, nothing, nothing)
 end
 
-type Numeric <: Value
+abstract Literal <: Value
+
+type Natural <: Literal
+	txt::AbstractString
+	value::Int64
+end
+
+type Numeric <: Literal
 	txt::AbstractString
 	value::Float64
 end
 
-type Lookup <: Value
+type Variable <: Value
 	txt::AbstractString
 	s::Symbol
 end
@@ -50,13 +70,6 @@ type Assign <: Lexeme
 	s::Symbol
 end
 
-type Eq <: Value
-	op::Union{Oper, Void}
-	lh::Union{Value, Void}
-	rh::Union{Value, Void}
-	Eq(val::Value) = new(nothing, val, nothing)
-	Eq(op::Oper) = new(op, nothing, nothing)
-end
 
 type Action <: Lexeme
 	txt::AbstractString
@@ -74,14 +87,41 @@ type SymbolTable
 	SymbolTable(p) = new(p, Dict{AbstractString, Union{Float64, AbstractString}}())
 end
 
-function lookup(s::Symbol, st::SymbolTable)
-	if st==nothing
-		error("$s not found")
+function tprint(t, a)
+	@printf "%s is a %s = %s\n" t typeof(a) a.txt
+end
+
+function evaluate(op::Binary, lh::Value, rh::Value, st::SymbolTable)
+	op.fn(evaluate(lh, st), evaluate(rh, st))
+end
+
+function evaluate(op::Unary, lh::Value, rh::Void, st::SymbolTable)
+	op.fn(evaluate(lh, st))
+end
+
+function evaluate(v::Literal, st::SymbolTable)
+	v.value
+end
+
+function evaluate(v::Variable, st::SymbolTable)
+	evaluate(v.value, st)
+end
+
+function evaluate(e::Eq, st::SymbolTable)
+	if e.op == nothing
+		return evaluate(e.lh, st)
 	end
-	if haskey(st, s)
+	return evaluate(e.op, e.lh, e.rh, st)
+end
+
+function evaluate(s::Symbol, st::SymbolTable)
+	if st==nothing
+		warn("$s not found")
+		nothing
+	elseif haskey(st, s)
 		st[s]
 	else
-		lookup(s, st.parent)
+		evaluate(s, st.parent)
 	end
 end
 
@@ -90,7 +130,9 @@ function assign(s::Symbol, st::SymbolTable, v)
 end
 
 Actions = Dict{AbstractString, Tuple{Function, Int64}}()
-Ops = Dict{AbstractString, Tuple{Function, Int64}}()
+LHs = Dict{AbstractString, Function}()
+RHs = Dict{AbstractString, Function}()
+Unarys = Dict{AbstractString, Function}()
 
 
 function input(stream, promptfn)
@@ -103,16 +145,16 @@ function input(stream, promptfn)
 					produce(Action(p, Actions[p]))
 				elseif haskey(RHs, p)
 					produce(RH(p, RHs[p]))
-				elseif haskey(LHOps, p)
-					produce(LH(p, LHs[p]))
 				elseif haskey(LHs, p)
-					produce(Op(p, Ops[p]))
+					produce(LH(p, LHs[p]))
+				elseif haskey(Unarys, p)
+					produce(Unary(p, Ops[p]))
 				elseif isnumber(p)
 					produce(Natural(p, parse(Int64, p)))
 				elseif !isnull(tryparse(Float64, p))
 					produce(Numeric(p, parse(Float64, p)))
 				elseif p[1] == ':'
-					produce(Lookup(p, symbol(p[2:end])))
+					produce(Variable(p, symbol(p[2:end])))
 				elseif p[1] == '"'
 					produce(Assign(p, symbol(p[2:end])))
 				elseif p == "~"
