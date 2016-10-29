@@ -69,15 +69,20 @@ function gotLexeme(l::Lexeme, u::Unrecognised)
 	drainStack("$(typeof(l)): $(u.txt)")
 end
 
-function gotOper(a::Action, eq::Eq, lh::Value, op::RH, rh::Value, o::Binary)
-@printf STDERR "%s" "gotOper(a::Action, eq::Eq, lh::Value, op::RH, rh::Value, o::Binary)\n"
-	pop!(a.args)
-	push!(a.args, Eq(o, eq))
+function gotOper(a::Action, eq::Eq, lh::Value, op::RH, rh::Value, nextlh::LH)
+@printf STDERR "%s" "gotOper(a::Action, eq::Eq, lh::Value, op::RH, rh::Value, nextlh::LH)\n"
+	eq.rh = Eq(nextlh, rh)
 end
 
-function gotOper(a::Action, eq::Eq, o::Oper)
+function gotOper(a::Action, eq::Eq, lh::Value, op::RH, rh::Value, nextrh::RH)
+@printf STDERR "%s" "gotOper(a::Action, eq::Eq, lh::Value, op::RH, rh::Value, nextrh::RH)\n"
+	pop!(a.args)
+	push!(a.args, Eq(nextrh, eq))
+end
+
+function gotOper(a::Action, eq::Eq, lh::LH)
 @printf STDERR "%s" "gotOper(a::Action, eq::Eq, o::Oper)\n"
-	gotOper(a, eq, eq.lh, eq.op, eq.rh, o)
+	gotOper(a, eq, eq.lh, eq.op, eq.rh, lh)
 end
 
 function gotOper(a::Action, v::Value, rh::RH)
@@ -87,11 +92,11 @@ function gotOper(a::Action, v::Value, rh::RH)
 	push!(a.args, Eq(rh, v))
 end
 
-function gotOper(a::Action, v::Value, rh::RH)
-h@printf STDERR "%s" "gotOper(a::Action, v::Value, rh::RH)\n"
+function gotOper(a::Action, v::Value, lh::LH)
+@printf STDERR "%s" "gotOper(a::Action, v::Value, lh::RH)\n"
 	# v not Eq
 	pop!(a.args)
-	push!(a.args, Eq(rh, v))
+	push!(a.args, Eq(lh, v))
 end
 
 function gotOper(a::Action, v::Value, u::Unary)
@@ -121,7 +126,11 @@ end
 
 function gotValue(a::Action, eq::Eq, v::Value)
 @printf STDERR "gotValue(a::Action [%s], eq::Eq [%s], v::Value [%s])\n" a eq v
-	a.args[end].rh = v
+	if typeof(eq.rh) == Eq && eq.rh.rh ==  nothing
+		eq.rh.rh = v
+	else
+		a.args[end].rh = v
+	end
 end
 
 function gotLexeme(a::Action, v::Value)
