@@ -11,6 +11,7 @@ using Lex
 #ActionS["right"] = (right, 1)
 Actions["exit"] = (quit, 0)
 Actions["print"] = (println, 1)
+Actions["make"] = (assign, 1)
 
 LHs["*"] = *
 LHs["/"] = /
@@ -110,18 +111,22 @@ function gotOper(eq::Eq, rh::Void, u::Unary)
 end
 
 function gotOper(eq::Eq, rh::Value, u::Unary)
-@printf STDERR "%s" "gotOper(eq::Eq, rh::Value, u::Unary)\n"
+@printf STDERR "%s\n" "gotOper(eq::Eq, rh::Value, u::Unary)"
 	drainStack("Unexpected Unary $(u.txt), expecting Binary")
 end
 
 function gotOper(a::Action, eq::Eq, u::Unary)
-@printf STDERR "%s" "gotOper(a::Action, eq::Eq, u::Unary)\n"
+@printf STDERR "%s\n" "gotOper(a::Action, eq::Eq, u::Unary)"
 	gotOper(eq, eq.rh, u)
 end
 
 function gotLexeme(a::Action, o::Oper)
-@printf STDERR "%s" "gotLexeme(a::Action, o::Oper)\n"
+@printf STDERR "%s\n" "gotLexeme(a::Action, o::Oper)"
 	gotOper(a, a.args[end], o)
+end
+
+function gotLexeme(a::Action, v::Assign)
+@printf STDERR "%s\n" "gotLexeme(a::Action, v::Assign)"
 end
 
 function gotValue(a::Action, eq::Eq, v::Value)

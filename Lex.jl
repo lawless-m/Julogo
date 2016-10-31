@@ -154,9 +154,9 @@ function input(stream, promptfn)
 				elseif !isnull(tryparse(Float64, p))
 					produce(Numeric(p, parse(Float64, p)))
 				elseif p[1] == ':'
-					produce(Variable(p, symbol(p[2:end])))
+					produce(Variable(p, Symbol(p[2:end])))
 				elseif p[1] == '"'
-					produce(Assign(p, symbol(p[2:end])))
+					produce(Assign(p, Symbol(p[2:end])))
 				elseif p == "~"
 					ln = ""
 					continue
